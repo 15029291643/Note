@@ -5,7 +5,6 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.example.note.databinding.HolderNoteBinding
-import com.example.note.db.Note
 
 class NoteAdapter(val notes: MutableList<Note>) : RecyclerView.Adapter<NoteAdapter.NodeHolder>() {
     class NodeHolder(binding: HolderNoteBinding) :  RecyclerView.ViewHolder(binding.root){
