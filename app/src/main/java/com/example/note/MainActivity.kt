@@ -3,86 +3,62 @@ package com.example.note
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.room.Dao
-import androidx.room.Database
-import androidx.room.Delete
-import androidx.room.Entity
-import androidx.room.Insert
-import androidx.room.PrimaryKey
-import androidx.room.Query
 import androidx.room.Room
-import androidx.room.RoomDatabase
 import com.example.note.databinding.ActivityMainBinding
+import com.example.note.db.Note
+import com.example.note.db.NoteDatabase
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private val notes: MutableList<Note> = mutableListOf()
     private lateinit var adapter: NoteAdapter
+    private lateinit var db: NoteDatabase
+    private val job = Job()
+    private val coroutinesScope = CoroutineScope(Dispatchers.IO + job)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        db = Room.databaseBuilder(
+            applicationContext,
+            NoteDatabase::class.java, "database-name"
+        ).build()
         adapter = NoteAdapter(notes)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         binding.add.setOnClickListener {
-            Note().apply {
-                height = 100
-                content = "2023-5-23 11:15"
-            }.also {
-                add(it)
-            }
+            add("note")
         }
         update()
-
-        val db = Room.databaseBuilder(
-            applicationContext,
-            AppDatabase::class.java, "database-name"
-        ).build()
-
-        val userDao = db.userDao()
-
-        GlobalScope.launch(Dispatchers.IO) {
-            val users = userDao.getAll()
-
-        }
-
     }
 
-    private fun add(note: Note) {
-        notes += note
-        adapter.notifyItemInserted(notes.lastIndex)
+    private fun add(s: String) {
+        Note().apply {
+            height = 200
+            content = s
+        }.also {
+            notes += it
+            adapter.notifyItemInserted(notes.lastIndex)
+            coroutinesScope.launch {
+                db.noteDao().add(it)
+            }
+        }
     }
 
     private fun update() {
-        adapter.notifyDataSetChanged()
+        coroutinesScope.launch {
+            db.noteDao().getAll().also {
+                notes.clear()
+                notes.addAll(it)
+                withContext(Dispatchers.Main) {
+                    adapter.notifyDataSetChanged()
+                }
+            }
+        }
     }
 }
-
-@Entity(tableName = "user")
-data class User(
-    @PrimaryKey val id: Int,
-    val name: String,
-    val age: Int
-)
-
-@Dao
-interface UserDao {
-    @Query("SELECT * FROM user")
-    fun getAll(): List<User>
-
-    @Insert
-    fun insertAll(vararg users: User)
-
-    @Delete
-    fun delete(user: User)
-}
-
-@Database(entities = arrayOf(User::class), version = 1)
-abstract class AppDatabase : RoomDatabase() {
-    abstract fun userDao(): UserDao
-}
-
